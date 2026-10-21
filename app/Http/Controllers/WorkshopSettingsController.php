@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Services\AuditService;
 use App\Services\TenantManager;
 use Illuminate\Http\RedirectResponse;
@@ -58,5 +58,28 @@ class WorkshopSettingsController extends Controller
         );
 
         return redirect()->route('settings.index')->with('success', 'Paramètres de l\'atelier enregistrés avec succès.');
+    }
+
+    public function switchTenant(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'integer'],
+        ]);
+
+        $membership = TenantMembership::where('user_id', auth()->id())
+            ->where('tenant_id', $validated['tenant_id'])
+            ->where('is_active', true)
+            ->with('tenant')
+            ->first();
+
+        if (! $membership || ! $membership->tenant || ! $membership->tenant->is_active) {
+            return back()->with('error', "Vous n'avez pas accès à cet atelier.");
+        }
+
+        $request->session()->put('current_tenant_id', $membership->tenant->id);
+        $this->tenantManager->setTenant($membership->tenant);
+
+        return redirect()->route('dashboard')
+            ->with('success', "Atelier actif basculé sur « {$membership->tenant->name} ».");
     }
 }

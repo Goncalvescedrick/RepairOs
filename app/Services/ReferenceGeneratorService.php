@@ -21,10 +21,11 @@ class ReferenceGeneratorService
         $pattern = "{$prefix}-{$year}-";
 
         return DB::transaction(function () use ($tenant, $pattern) {
+            $startPos = strlen($pattern) + 1;
             $lastTicket = RepairTicket::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
                 ->where('reference', 'LIKE', "{$pattern}%")
-                ->orderByRaw('CAST(SUBSTRING(reference, -4) AS UNSIGNED) DESC')
+                ->orderByRaw("CAST(SUBSTRING(reference, {$startPos}) AS UNSIGNED) DESC")
                 ->lockForUpdate()
                 ->first();
 
@@ -48,10 +49,11 @@ class ReferenceGeneratorService
         $pattern = "{$prefix}-{$year}-";
 
         return DB::transaction(function () use ($tenant, $pattern) {
+            $startPos = strlen($pattern) + 1;
             $lastQuote = Quote::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
                 ->where('reference', 'LIKE', "{$pattern}%")
-                ->orderByRaw('CAST(SUBSTRING(reference, -4) AS UNSIGNED) DESC')
+                ->orderByRaw("CAST(SUBSTRING(reference, {$startPos}) AS UNSIGNED) DESC")
                 ->lockForUpdate()
                 ->first();
 
@@ -75,10 +77,11 @@ class ReferenceGeneratorService
         $pattern = "{$prefix}-{$year}-";
 
         return DB::transaction(function () use ($tenant, $pattern) {
+            $startPos = strlen($pattern) + 1;
             $lastInvoice = Invoice::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
                 ->where('reference', 'LIKE', "{$pattern}%")
-                ->orderByRaw('CAST(SUBSTRING(reference, -4) AS UNSIGNED) DESC')
+                ->orderByRaw("CAST(SUBSTRING(reference, {$startPos}) AS UNSIGNED) DESC")
                 ->lockForUpdate()
                 ->first();
 
@@ -102,10 +105,11 @@ class ReferenceGeneratorService
         $pattern = "{$prefix}-{$year}-";
 
         return DB::transaction(function () use ($tenant, $pattern) {
+            $startPos = strlen($pattern) + 1;
             $lastPayment = Payment::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
                 ->where('reference', 'LIKE', "{$pattern}%")
-                ->orderByRaw('CAST(SUBSTRING(reference, -4) AS UNSIGNED) DESC')
+                ->orderByRaw("CAST(SUBSTRING(reference, {$startPos}) AS UNSIGNED) DESC")
                 ->lockForUpdate()
                 ->first();
 

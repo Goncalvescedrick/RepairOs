@@ -97,6 +97,65 @@
                                    class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
                         </div>
                     </div>
+
+                    <!-- Grille d'Inspection Visuelle Rapide -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Grille d'Inspection Visuelle à l'Entrée</span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800">Anti-litige client</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Écran / Dalle</label>
+                                <select name="intake_checklist[screen]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="Intact">Intact</option>
+                                    <option value="Micro-rayures">Micro-rayures</option>
+                                    <option value="Fissuré / Cassé">Fissuré / Cassé</option>
+                                    <option value="Non testable (Éteint)">Non testable (Éteint)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Clavier / Pavé tactile</label>
+                                <select name="intake_checklist[keyboard]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="Complet & Fonctionnel">Complet & Fonctionnel</option>
+                                    <option value="Touches manquantes/usées">Touches manquantes/usées</option>
+                                    <option value="Défectueux">Défectueux</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Châssis & Charnières</label>
+                                <select name="intake_checklist[chassis]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="Bon état">Bon état</option>
+                                    <option value="Rayures / Chocs">Rayures / Chocs</option>
+                                    <option value="Charnière cassée">Charnière cassée</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Batterie</label>
+                                <select name="intake_checklist[battery]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="Présente">Présente</option>
+                                    <option value="Absente">Absente</option>
+                                    <option value="Gonflée / HS">Gonflée / HS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ports & Connecteurs</label>
+                                <select name="intake_checklist[ports]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="RAS">RAS</option>
+                                    <option value="Connecteur charge abîmé">Connecteur charge abîmé</option>
+                                    <option value="Port USB/HDMI endommagé">Port USB/HDMI endommagé</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Allumage au comptoir</label>
+                                <select name="intake_checklist[power]" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                                    <option value="S'allume">S'allume</option>
+                                    <option value="Ne s'allume pas">Ne s'allume pas</option>
+                                    <option value="Démarre sans affichage">Démarre sans affichage</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 3. Paramètres opérationnels -->
@@ -140,6 +199,24 @@
                             <input id="estimated_completion_date" type="datetime-local" name="estimated_completion_date"
                                    value="{{ old('estimated_completion_date') }}"
                                    class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200/80">
+                        <div>
+                            <label for="device_access_code" class="block text-xs font-semibold text-slate-700 mb-1">
+                                Code PIN / Mot de passe session (Coffre-fort temporaire)
+                            </label>
+                            <input id="device_access_code" type="text" name="device_access_code" value="{{ old('device_access_code') }}"
+                                   placeholder="Chiffré AES-256 et purgé automatiquement à la restitution"
+                                   class="w-full px-3.5 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        </div>
+                        <div>
+                            <label for="warranty_days" class="block text-xs font-semibold text-slate-700 mb-1">
+                                Garantie SAV après restitution (jours)
+                            </label>
+                            <input id="warranty_days" type="number" min="0" max="1095" name="warranty_days" value="{{ old('warranty_days', 30) }}"
+                                   class="w-full px-3.5 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
                         </div>
                     </div>
                 </div>

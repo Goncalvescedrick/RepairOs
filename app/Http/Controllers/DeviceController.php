@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\TenantManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class DeviceController extends Controller
@@ -26,12 +27,12 @@ class DeviceController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('brand', 'LIKE', "%{$search}%")
-                  ->orWhere('model', 'LIKE', "%{$search}%")
-                  ->orWhere('serial_number', 'LIKE', "%{$search}%")
-                  ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'LIKE', "%{$search}%")
-                         ->orWhere('phone', 'LIKE', "%{$search}%");
-                  });
+                    ->orWhere('model', 'LIKE', "%{$search}%")
+                    ->orWhere('serial_number', 'LIKE', "%{$search}%")
+                    ->orWhereHas('customer', function ($cq) use ($search) {
+                        $cq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('phone', 'LIKE', "%{$search}%");
+                    });
             });
         }
 
@@ -58,14 +59,20 @@ class DeviceController extends Controller
     {
         $this->authorize('create', Device::class);
 
+        $tenantId = $this->tenantManager->getTenantId();
+
         $validated = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
+            'customer_id' => [
+                'required',
+                Rule::exists('customers', 'id')->where('tenant_id', $tenantId),
+            ],
             'category' => ['required', 'string', 'in:laptop,desktop,printer,network,other,LAPTOP,DESKTOP,PRINTER,NETWORK,OTHER'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],
             'serial_number' => ['nullable', 'string', 'max:100'],
             'aesthetic_condition' => ['nullable', 'string'],
             'accessories' => ['nullable', 'string'],
+            'reported_accessories' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -73,14 +80,14 @@ class DeviceController extends Controller
         $customer = Customer::findOrFail($validated['customer_id']);
 
         $device = Device::create([
-            'tenant_id' => $this->tenantManager->getTenantId(),
+            'tenant_id' => $tenantId,
             'customer_id' => $customer->id,
-            'category' => $validated['category'],
+            'category' => strtolower($validated['category']),
             'brand' => $validated['brand'],
             'model' => $validated['model'],
             'serial_number' => $validated['serial_number'] ?? null,
             'aesthetic_condition' => $validated['aesthetic_condition'] ?? null,
-            'accessories' => $validated['accessories'] ?? null,
+            'accessories' => $validated['accessories'] ?? $validated['reported_accessories'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -120,7 +127,7 @@ class DeviceController extends Controller
         $this->authorize('update', $device);
 
         $validated = $request->validate([
-            'category' => ['required', 'string', 'in:laptop,desktop,printer,network,other'],
+            'category' => ['required', 'string', 'in:laptop,desktop,printer,network,other,LAPTOP,DESKTOP,PRINTER,NETWORK,OTHER'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],
             'serial_number' => ['nullable', 'string', 'max:100'],
@@ -129,6 +136,7 @@ class DeviceController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        $validated['category'] = strtolower($validated['category']);
         $oldValues = $device->only(['category', 'brand', 'model', 'serial_number', 'aesthetic_condition', 'accessories', 'notes']);
         $device->update($validated);
 

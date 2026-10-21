@@ -24,11 +24,17 @@
         </div>
 
         <!-- Financial Overview KPIs -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
                 <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Chiffre d'Affaires Facturé</span>
                 <div class="text-2xl font-extrabold text-slate-900 mt-1">{{ number_format($totalInvoiced, 0, ',', ' ') }} {{ $tenant->currency }}</div>
                 <div class="text-xs text-slate-500 mt-1">{{ $invoicesCount }} facture(s) émise(s) sur la période</div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 shadow-sm">
+                <span class="text-xs font-semibold uppercase tracking-wider text-indigo-700">Marge Brute Estimée</span>
+                <div class="text-2xl font-extrabold text-indigo-700 mt-1">{{ number_format($estimatedGrossMargin ?? $totalInvoiced, 0, ',', ' ') }} {{ $tenant->currency }}</div>
+                <div class="text-xs text-indigo-700/80 mt-1">CA net hors coût d'achat des pièces ({{ number_format($totalPartsCost ?? 0, 0, ',', ' ') }})</div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">

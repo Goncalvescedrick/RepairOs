@@ -19,6 +19,10 @@
                     @endif
                     <span>&bull;</span>
                     <span>Ticket : <a href="{{ route('tickets.show', $quote->ticket) }}" class="text-blue-600 font-mono font-semibold hover:underline">{{ $quote->ticket->reference }}</a></span>
+                    @if($quote->approved_by_name)
+                    <span>&bull;</span>
+                    <span class="text-emerald-700 font-semibold">Approuvé par : {{ $quote->approved_by_name }}</span>
+                    @endif
                 </div>
             </div>
 
@@ -57,9 +61,21 @@
                 @endif
 
                 @if($quote->status === \App\Enums\QuoteStatus::ACCEPTE)
-                <a href="{{ route('invoices.create', ['quote_id' => $quote->id]) }}" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-xs">
-                    + Émettre la Facture
-                </a>
+                    @php
+                        $activeInvoice = $quote->invoices->where('status', '!=', \App\Enums\InvoiceStatus::ANNULEE)->first();
+                    @endphp
+                    @if($activeInvoice)
+                        <a href="{{ route('invoices.show', $activeInvoice) }}" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-xs">
+                            Voir Facture {{ $activeInvoice->reference }}
+                        </a>
+                    @else
+                        <form action="{{ route('quotes.convert-to-invoice', $quote) }}" method="POST" class="inline">
+                            @csrf
+                            <button type="submit" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-xs">
+                                + Émettre la Facture
+                            </button>
+                        </form>
+                    @endif
                 @endif
             </div>
         </div>

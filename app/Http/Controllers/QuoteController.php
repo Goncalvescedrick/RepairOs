@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Quote;
 use App\Models\RepairTicket;
+use App\Models\SparePart;
 use App\Services\AuditService;
 use App\Services\NotificationMessageService;
 use App\Services\QuoteService;
 use App\Services\TenantManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class QuoteController extends Controller
@@ -30,10 +32,10 @@ class QuoteController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('reference', 'LIKE', "%{$search}%")
-                  ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'LIKE', "%{$search}%")
-                         ->orWhere('phone', 'LIKE', "%{$search}%");
-                  });
+                    ->orWhereHas('customer', function ($cq) use ($search) {
+                        $cq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('phone', 'LIKE', "%{$search}%");
+                    });
             });
         }
 
@@ -62,21 +64,28 @@ class QuoteController extends Controller
             ->get();
 
         $tenant = $this->tenantManager->getTenant();
+        $spareParts = SparePart::where('is_active', true)->orderBy('name')->get();
 
-        return view('quotes.create', compact('ticket', 'tickets', 'tenant'));
+        return view('quotes.create', compact('ticket', 'tickets', 'tenant', 'spareParts'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Quote::class);
 
+        $tenantId = $this->tenantManager->getTenantId();
+
         $validated = $request->validate([
-            'repair_ticket_id' => ['required', 'exists:repair_tickets,id'],
+            'repair_ticket_id' => [
+                'required',
+                Rule::exists('repair_tickets', 'id')->where('tenant_id', $tenantId),
+            ],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'valid_until' => ['nullable', 'date', 'after_or_equal:today'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.spare_part_id' => ['nullable', 'integer'],
             'items.*.type' => ['required', 'string', 'in:SERVICE,PART,OTHER'],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
@@ -119,6 +128,7 @@ class QuoteController extends Controller
 
         try {
             $this->quoteService->markAsSent($quote, auth()->user());
+
             return redirect()->route('quotes.show', $quote)
                 ->with('success', "Le devis {$quote->reference} a été marqué comme envoyé.");
         } catch (\Exception $e) {
@@ -132,6 +142,7 @@ class QuoteController extends Controller
 
         try {
             $this->quoteService->acceptQuote($quote, auth()->user());
+
             return redirect()->route('quotes.show', $quote)
                 ->with('success', "Le devis {$quote->reference} a été accepté. Le ticket est passé en cours de réparation.");
         } catch (\Exception $e) {
@@ -149,8 +160,9 @@ class QuoteController extends Controller
 
         try {
             $this->quoteService->refuseQuote($quote, $validated['refusal_reason'] ?? null, auth()->user());
+
             return redirect()->route('quotes.show', $quote)
-                ->with('success', "Le devis a été marqué comme refusé.");
+                ->with('success', 'Le devis a été marqué comme refusé.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }

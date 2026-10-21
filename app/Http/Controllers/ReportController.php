@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\RepairStatus;
 use App\Models\AuditLog;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\RepairIntervention;
 use App\Models\RepairTicket;
@@ -35,10 +36,19 @@ class ReportController extends Controller
             ? Carbon::parse($request->input('end_date'))->endOfDay()
             : Carbon::now()->endOfDay();
 
-        // 1. Financial metrics
-        $totalInvoiced = (float) Invoice::whereBetween('created_at', [$startDate, $endDate])
-            ->where('status', '!=', 'ANNULEE')
-            ->sum('total_amount');
+        // 1. Financial metrics & Gross Margin
+        $invoicesQuery = Invoice::whereBetween('created_at', [$startDate, $endDate])
+            ->where('status', '!=', 'ANNULEE');
+
+        $totalInvoiced = (float) (clone $invoicesQuery)->sum('total_amount');
+
+        $totalPartsCost = (float) InvoiceItem::whereHas('invoice', function ($q) use ($startDate, $endDate) {
+            $q->whereBetween('created_at', [$startDate, $endDate])
+                ->where('status', '!=', 'ANNULEE');
+        })->selectRaw('COALESCE(SUM(quantity * purchase_cost_unit), 0) as total_cost')
+            ->value('total_cost');
+
+        $estimatedGrossMargin = max(0.0, round($totalInvoiced - $totalPartsCost, 2));
 
         $totalCollected = (float) Payment::whereBetween('paid_at', [$startDate, $endDate])
             ->where('is_cancelled', false)
@@ -69,12 +79,17 @@ class ReportController extends Controller
             $averageTurnaroundDays = round($avgHours / 24, 1);
         }
 
-        // Breakdown by status
+        // Breakdown by status (Single grouped query instead of N queries)
+        $groupedStatuses = RepairTicket::query()
+            ->select('status', DB::raw('COUNT(*) as aggregate'))
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
         $statusCounts = [];
         foreach (RepairStatus::cases() as $case) {
             $statusCounts[$case->value] = [
                 'label' => $case->label(),
-                'count' => RepairTicket::where('status', $case->value)->count(),
+                'count' => (int) ($groupedStatuses[$case->value] ?? 0),
             ];
         }
 
@@ -115,6 +130,8 @@ class ReportController extends Controller
             'startDate',
             'endDate',
             'totalInvoiced',
+            'totalPartsCost',
+            'estimatedGrossMargin',
             'totalCollected',
             'totalBalanceDue',
             'invoicesCount',

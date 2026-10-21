@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Quote extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToTenant;
+    use BelongsToTenant, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',
@@ -29,6 +29,8 @@ class Quote extends Model
         'valid_until',
         'sent_at',
         'accepted_at',
+        'approved_by_name',
+        'approved_ip',
         'refused_at',
         'refusal_reason',
         'notes',

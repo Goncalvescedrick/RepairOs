@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Models\Quote;
 use App\Models\RepairTicket;
+use App\Models\SparePart;
 use App\Services\AuditService;
 use App\Services\InvoiceService;
 use App\Services\TenantManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class InvoiceController extends Controller
@@ -29,10 +31,10 @@ class InvoiceController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('reference', 'LIKE', "%{$search}%")
-                  ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'LIKE', "%{$search}%")
-                         ->orWhere('phone', 'LIKE', "%{$search}%");
-                  });
+                    ->orWhereHas('customer', function ($cq) use ($search) {
+                        $cq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('phone', 'LIKE', "%{$search}%");
+                    });
             });
         }
 
@@ -52,6 +54,7 @@ class InvoiceController extends Controller
         // If converting from an accepted Quote
         if ($quoteId = $request->input('quote_id')) {
             $quote = Quote::with(['items', 'customer', 'ticket'])->findOrFail($quoteId);
+
             return $this->convertFromQuote($quote);
         }
 
@@ -66,16 +69,19 @@ class InvoiceController extends Controller
             ->get();
 
         $tenant = $this->tenantManager->getTenant();
+        $spareParts = SparePart::where('is_active', true)->orderBy('name')->get();
 
-        return view('invoices.create', compact('ticket', 'tickets', 'tenant'));
+        return view('invoices.create', compact('ticket', 'tickets', 'tenant', 'spareParts'));
     }
 
     public function convertFromQuote(Quote $quote): RedirectResponse
     {
         $this->authorize('create', Invoice::class);
+        $this->authorize('view', $quote);
 
         try {
             $invoice = $this->invoiceService->createFromQuote($quote, auth()->user());
+
             return redirect()->route('invoices.show', $invoice)
                 ->with('success', "Facture {$invoice->reference} émise à partir du devis {$quote->reference}.");
         } catch (\Exception $e) {
@@ -87,13 +93,19 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
+        $tenantId = $this->tenantManager->getTenantId();
+
         $validated = $request->validate([
-            'repair_ticket_id' => ['required', 'exists:repair_tickets,id'],
+            'repair_ticket_id' => [
+                'required',
+                Rule::exists('repair_tickets', 'id')->where('tenant_id', $tenantId),
+            ],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.spare_part_id' => ['nullable', 'integer'],
             'items.*.type' => ['required', 'string', 'in:SERVICE,PART,OTHER'],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
@@ -143,6 +155,7 @@ class InvoiceController extends Controller
 
         try {
             $this->invoiceService->cancelInvoice($invoice, $validated['reason'], auth()->user());
+
             return redirect()->route('invoices.show', $invoice)
                 ->with('success', "La facture {$invoice->reference} a été annulée.");
         } catch (\InvalidArgumentException $e) {

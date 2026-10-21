@@ -158,6 +158,11 @@
                                         <a href="{{ route('payments.receipt', $payment) }}" target="_blank" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded font-medium text-slate-700 text-[11px]">
                                             Imprimer Reçu
                                         </a>
+                                        @can('cancel', $payment)
+                                        <button type="button" @click="cancelPaymentModal = true; cancelPaymentId = {{ $payment->id }}" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-medium text-[11px]">
+                                            Annuler
+                                        </button>
+                                        @endcan
                                     </td>
                                 </tr>
                                 @endforeach
@@ -202,7 +207,7 @@
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-200 text-emerald-900">Encaissement direct</span>
                     </div>
 
-                    <form action="{{ route('invoices.payments.store', $invoice) }}" method="POST" class="space-y-3">
+                    <form action="{{ route('payments.store', $invoice) }}" method="POST" class="space-y-3">
                         @csrf
 
                         <div>
@@ -269,6 +274,35 @@
 
                     <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
                         <button type="button" @click="cancelInvoiceModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800">
+                            Fermer
+                        </button>
+                        <button type="submit" class="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition">
+                            Confirmer l'Annulation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modale d'Annulation d'un Règlement -->
+        <div x-show="cancelPaymentModal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" style="display: none;">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+                <div class="flex items-center space-x-2 text-rose-600 font-bold text-base">
+                    <span>Annuler ce Règlement</span>
+                </div>
+                <p class="text-xs text-slate-600">
+                    L'annulation d'un paiement réajuste automatiquement le solde dû de la facture et est journalisée dans l'audit.
+                </p>
+
+                <form :action="`/payments/${cancelPaymentId}/cancel`" method="POST" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label for="cancellation_reason" class="block text-xs font-semibold text-slate-700 mb-1">Motif d'annulation du règlement *</label>
+                        <textarea id="cancellation_reason" name="cancellation_reason" rows="3" required placeholder="Erreur de saisie du montant ou doublon..." class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg"></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                        <button type="button" @click="cancelPaymentModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800">
                             Fermer
                         </button>
                         <button type="submit" class="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition">

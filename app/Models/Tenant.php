@@ -75,4 +75,9 @@ class Tenant extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function spareParts(): HasMany
+    {
+        return $this->hasMany(SparePart::class);
+    }
 }

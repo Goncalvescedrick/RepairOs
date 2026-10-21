@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Device extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToTenant;
+    use BelongsToTenant, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',
@@ -43,12 +43,17 @@ class Device extends Model
 
     public function getCategoryLabelAttribute(): string
     {
-        return match ($this->category) {
+        return match (strtolower((string) $this->category)) {
             'laptop' => 'Ordinateur portable',
             'desktop' => 'Ordinateur de bureau / Fixe',
             'printer' => 'Imprimante',
             'network' => 'Équipement réseau',
             default => 'Autre équipement',
         };
+    }
+
+    public function getDeviceCategoryLabelAttribute(): string
+    {
+        return $this->category_label;
     }
 }

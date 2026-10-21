@@ -10,6 +10,7 @@ use App\Services\TenantManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -25,16 +26,29 @@ class AttachmentController extends Controller
         $this->authorize('create', Attachment::class);
 
         $validated = $request->validate([
-            'attachable_type' => ['required', 'string', 'in:ticket,device'],
+            'attachable_type' => [
+                'required',
+                'string',
+                Rule::in([
+                    'ticket',
+                    'device',
+                    RepairTicket::class,
+                    Device::class,
+                ]),
+            ],
             'attachable_id' => ['required', 'integer'],
             'file' => ['required', 'file', 'max:10240', 'mimes:jpeg,jpg,png,webp,pdf,txt'],
-            'file_category' => ['nullable', 'string', 'in:DEVICE_PHOTO,DIAGNOSTIC,TEST_RESULT,DEVIS_SIGNE,AUTRE'],
+            'file_category' => [
+                'nullable',
+                'string',
+                'in:INTAKE_PHOTO,DEVICE_PHOTO,DIAGNOSTIC,DIAGNOSTIC_DOCUMENT,TEST_RESULT,DEVIS_SIGNE,PROOF,AUTRE',
+            ],
             'is_public_to_client' => ['nullable', 'boolean'],
         ]);
 
         $modelClass = match ($validated['attachable_type']) {
-            'ticket' => RepairTicket::class,
-            'device' => Device::class,
+            'ticket', RepairTicket::class => RepairTicket::class,
+            'device', Device::class => Device::class,
         };
 
         $model = $modelClass::findOrFail($validated['attachable_id']);
@@ -71,7 +85,7 @@ class AttachmentController extends Controller
 
         return response()->file($fullPath, [
             'Content-Type' => $attachment->mime_type,
-            'Content-Disposition' => 'inline; filename="' . addslashes($attachment->original_filename) . '"',
+            'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',
         ]);
     }
 

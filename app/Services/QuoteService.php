@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Enums\QuoteStatus;
 use App\Enums\RepairStatus;
 use App\Models\Quote;
-use App\Models\QuoteItem;
 use App\Models\RepairTicket;
+use App\Models\SparePart;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -37,17 +37,32 @@ class QuoteService
                 $lineTotal = round($qty * $unitPrice, 2);
                 $subtotal += $lineTotal;
 
+                $sparePartId = ! empty($item['spare_part_id']) ? (int) $item['spare_part_id'] : null;
+                $purchaseCostUnit = isset($item['purchase_cost_unit']) ? (float) $item['purchase_cost_unit'] : 0.00;
+
+                if ($sparePartId) {
+                    $part = SparePart::where('tenant_id', $tenant->id)->find($sparePartId);
+                    if ($part) {
+                        $purchaseCostUnit = (float) $part->purchase_price;
+                    } else {
+                        $sparePartId = null;
+                    }
+                }
+
                 $parsedItems[] = [
-                    'type' => $item['type'] ?? 'SERVICE',
+                    'spare_part_id' => $sparePartId,
+                    'type' => $item['type'] ?? $item['item_type'] ?? 'SERVICE',
                     'description' => trim((string) ($item['description'] ?? 'Prestation')),
                     'quantity' => $qty,
                     'unit_price' => $unitPrice,
+                    'purchase_cost_unit' => $purchaseCostUnit,
                     'total_price' => $lineTotal,
                 ];
             }
 
-            $taxAmount = round($subtotal * ($taxRate / 100), 2);
-            $totalAmount = max(0.00, round($subtotal - $discount + $taxAmount, 2));
+            $netCommercial = max(0.00, round($subtotal - $discount, 2));
+            $taxAmount = round($netCommercial * ($taxRate / 100), 2);
+            $totalAmount = round($netCommercial + $taxAmount, 2);
 
             $quote = Quote::create([
                 'tenant_id' => $tenant->id,
@@ -71,7 +86,7 @@ class QuoteService
 
             // Transition ticket to DEVIS_EN_ATTENTE if in DIAGNOSTIC
             if ($ticket->status === RepairStatus::DIAGNOSTIC && $this->stateMachine->canTransition($ticket, RepairStatus::DEVIS_EN_ATTENTE)) {
-                $this->stateMachine->transition($ticket, RepairStatus::DEVIS_EN_ATTENTE, $user, 'Création du devis ' . $quote->reference);
+                $this->stateMachine->transition($ticket, RepairStatus::DEVIS_EN_ATTENTE, $user, 'Création du devis '.$quote->reference);
             }
 
             $this->auditService->log(
@@ -94,7 +109,7 @@ class QuoteService
     public function markAsSent(Quote $quote, ?User $user = null): Quote
     {
         if ($quote->status !== QuoteStatus::BROUILLON) {
-            throw new InvalidArgumentException("Seul un devis au statut Brouillon peut être marqué comme envoyé.");
+            throw new InvalidArgumentException('Seul un devis au statut Brouillon peut être marqué comme envoyé.');
         }
 
         return DB::transaction(function () use ($quote, $user) {
@@ -118,25 +133,43 @@ class QuoteService
         });
     }
 
-    public function acceptQuote(Quote $quote, ?User $user = null): Quote
-    {
+    public function acceptQuote(
+        Quote $quote,
+        ?User $user = null,
+        ?string $approvedByName = null,
+        ?string $approvedIp = null
+    ): Quote {
         if (! in_array($quote->status, [QuoteStatus::BROUILLON, QuoteStatus::ENVOYE], true)) {
             throw new InvalidArgumentException("Ce devis ne peut plus être accepté car son statut actuel est {$quote->status->label()}.");
         }
 
-        return DB::transaction(function () use ($quote, $user) {
+        return DB::transaction(function () use ($quote, $user, $approvedByName, $approvedIp) {
             $quote->status = QuoteStatus::ACCEPTE;
             $quote->accepted_at = now();
+            if ($approvedByName) {
+                $quote->approved_by_name = $approvedByName;
+            }
+            if ($approvedIp) {
+                $quote->approved_ip = $approvedIp;
+            }
             $quote->save();
 
             $ticket = $quote->ticket;
+            $reason = $approvedByName
+                ? "Devis {$quote->reference} approuvé en ligne par {$approvedByName}"
+                : "Devis {$quote->reference} validé par le client";
+
             if ($ticket && $this->stateMachine->canTransition($ticket, RepairStatus::EN_REPARATION)) {
-                $this->stateMachine->transition($ticket, RepairStatus::EN_REPARATION, $user, "Devis {$quote->reference} validé par le client");
+                $this->stateMachine->transition($ticket, RepairStatus::EN_REPARATION, $user, $reason);
             }
 
             $this->auditService->log(
                 event: 'quote.accepted',
                 auditable: $quote,
+                newValues: array_filter([
+                    'approved_by_name' => $approvedByName,
+                    'approved_ip' => $approvedIp,
+                ]) ?: null,
                 userId: $user?->id,
                 tenantId: $quote->tenant_id
             );

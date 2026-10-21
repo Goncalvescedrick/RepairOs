@@ -6,6 +6,7 @@ use App\Models\RepairIntervention;
 use App\Models\RepairTicket;
 use App\Services\AuditService;
 use App\Services\TenantManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -57,5 +58,55 @@ class RepairInterventionController extends Controller
 
         return redirect()->route('tickets.show', $ticket)
             ->with('success', 'Intervention / Diagnostic consigné avec succès.');
+    }
+
+    /**
+     * Copilot Atelier : transforme des notes techniques brutes en synthèse claire et rassurante pour le client.
+     */
+    public function generateClientSummary(Request $request, RepairTicket $ticket): JsonResponse
+    {
+        $this->authorize('view', $ticket);
+
+        $validated = $request->validate([
+            'intervention_type' => ['nullable', 'string'],
+            'work_performed' => ['nullable', 'string', 'max:2000'],
+            'diagnosis' => ['nullable', 'string', 'max:2000'],
+            'test_results' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $type = $validated['intervention_type'] ?? 'DIAGNOSTIC';
+        $work = trim((string) ($validated['work_performed'] ?? ''));
+        $diag = trim((string) ($validated['diagnosis'] ?? ''));
+        $tests = trim((string) ($validated['test_results'] ?? ''));
+
+        $deviceLabel = trim($ticket->device->brand.' '.$ticket->device->model);
+
+        $typePrefix = match ($type) {
+            'DIAGNOSTIC' => "Examen technique complet effectué sur votre {$deviceLabel}.",
+            'OPERATION' => "Intervention de réparation réalisée sur votre {$deviceLabel}.",
+            'TEST' => "Contrôle qualité et tests de stabilité effectués sur votre {$deviceLabel}.",
+            default => "Point d'étape technique sur votre {$deviceLabel}.",
+        };
+
+        $parts = [$typePrefix];
+
+        if ($diag !== '') {
+            $cleanDiag = rtrim($diag, '.');
+            $parts[] = "Diagnostic identifié : {$cleanDiag}.";
+        }
+
+        if ($work !== '') {
+            $cleanWork = rtrim($work, '.');
+            $parts[] = "Opérations réalisées : {$cleanWork}.";
+        }
+
+        if ($tests !== '') {
+            $cleanTests = rtrim($tests, '.');
+            $parts[] = "Tests de validation : {$cleanTests}.";
+        }
+
+        return response()->json([
+            'summary' => implode(' ', $parts),
+        ]);
     }
 }

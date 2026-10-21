@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\Quote;
 use App\Models\RepairTicket;
+use App\Models\SparePart;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -20,6 +20,10 @@ class InvoiceService
 
     public function createFromQuote(Quote $quote, ?User $user = null): Invoice
     {
+        if ($quote->invoices()->where('status', '!=', InvoiceStatus::ANNULEE)->exists()) {
+            throw new InvalidArgumentException("Une facture active a déjà été émise pour le devis {$quote->reference}.");
+        }
+
         $ticket = $quote->ticket;
         $tenant = $quote->tenant;
 
@@ -48,12 +52,20 @@ class InvoiceService
 
             foreach ($quote->items as $item) {
                 $invoice->items()->create([
+                    'spare_part_id' => $item->spare_part_id,
                     'type' => $item->type,
                     'description' => $item->description,
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
+                    'purchase_cost_unit' => $item->purchase_cost_unit ?? 0.00,
                     'total_price' => $item->total_price,
                 ]);
+
+                if ($item->spare_part_id) {
+                    SparePart::where('tenant_id', $tenant->id)
+                        ->where('id', $item->spare_part_id)
+                        ->decrement('stock_quantity', max(1, (int) round((float) $item->quantity)));
+                }
             }
 
             $this->auditService->log(
@@ -86,17 +98,32 @@ class InvoiceService
                 $lineTotal = round($qty * $unitPrice, 2);
                 $subtotal += $lineTotal;
 
+                $sparePartId = ! empty($item['spare_part_id']) ? (int) $item['spare_part_id'] : null;
+                $purchaseCostUnit = isset($item['purchase_cost_unit']) ? (float) $item['purchase_cost_unit'] : 0.00;
+
+                if ($sparePartId) {
+                    $part = SparePart::where('tenant_id', $tenant->id)->find($sparePartId);
+                    if ($part) {
+                        $purchaseCostUnit = (float) $part->purchase_price;
+                    } else {
+                        $sparePartId = null;
+                    }
+                }
+
                 $parsedItems[] = [
+                    'spare_part_id' => $sparePartId,
                     'type' => $item['type'] ?? 'SERVICE',
                     'description' => trim((string) ($item['description'] ?? 'Intervention technique')),
                     'quantity' => $qty,
                     'unit_price' => $unitPrice,
+                    'purchase_cost_unit' => $purchaseCostUnit,
                     'total_price' => $lineTotal,
                 ];
             }
 
-            $taxAmount = round($subtotal * ($taxRate / 100), 2);
-            $totalAmount = max(0.00, round($subtotal - $discount + $taxAmount, 2));
+            $netCommercial = max(0.00, round($subtotal - $discount, 2));
+            $taxAmount = round($netCommercial * ($taxRate / 100), 2);
+            $totalAmount = round($netCommercial + $taxAmount, 2);
 
             $invoice = Invoice::create([
                 'tenant_id' => $tenant->id,
@@ -119,6 +146,12 @@ class InvoiceService
 
             foreach ($parsedItems as $itemData) {
                 $invoice->items()->create($itemData);
+
+                if (! empty($itemData['spare_part_id'])) {
+                    SparePart::where('tenant_id', $tenant->id)
+                        ->where('id', $itemData['spare_part_id'])
+                        ->decrement('stock_quantity', max(1, (int) round((float) $itemData['quantity'])));
+                }
             }
 
             $this->auditService->log(
@@ -136,7 +169,7 @@ class InvoiceService
     public function cancelInvoice(Invoice $invoice, string $reason, ?User $user = null): Invoice
     {
         if ($invoice->status === InvoiceStatus::ANNULEE) {
-            throw new InvalidArgumentException("Cette facture est déjà annulée.");
+            throw new InvalidArgumentException('Cette facture est déjà annulée.');
         }
 
         if ($invoice->paid_amount > 0) {
@@ -146,6 +179,15 @@ class InvoiceService
         return DB::transaction(function () use ($invoice, $reason, $user) {
             $invoice->status = InvoiceStatus::ANNULEE;
             $invoice->save();
+
+            // Restock spare parts linked to cancelled invoice
+            foreach ($invoice->items as $item) {
+                if ($item->spare_part_id) {
+                    SparePart::where('tenant_id', $invoice->tenant_id)
+                        ->where('id', $item->spare_part_id)
+                        ->increment('stock_quantity', max(1, (int) round((float) $item->quantity)));
+                }
+            }
 
             $this->auditService->log(
                 event: 'invoice.cancelled',

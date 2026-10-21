@@ -12,6 +12,7 @@ use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RepairInterventionController;
 use App\Http\Controllers\RepairTicketController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SparePartController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\WorkshopSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/suivi/{token}', [PublicTrackingController::class, 'show'])->name('public.tracking.show');
     Route::get('/suivi/{token}/document/{attachment}', [PublicTrackingController::class, 'attachment'])->name('public.tracking.attachment');
+    Route::post('/suivi/{token}/devis/{quote}/accept', [PublicTrackingController::class, 'acceptQuote'])->name('public.tracking.quote.accept');
+    Route::post('/suivi/{token}/devis/{quote}/refuse', [PublicTrackingController::class, 'refuseQuote'])->name('public.tracking.quote.refuse');
 });
 
 /*
@@ -52,6 +55,7 @@ Route::get('/', function () {
     if (auth()->check()) {
         return redirect()->route('dashboard');
     }
+
     return view('welcome');
 })->name('home');
 
@@ -73,22 +77,30 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::resource('tickets', RepairTicketController::class);
     Route::post('/tickets/{ticket}/transition', [RepairTicketController::class, 'transition'])->name('tickets.transition');
     Route::get('/tickets/{ticket}/receipt', [RepairTicketController::class, 'receipt'])->name('tickets.receipt');
+    Route::get('/tickets/{ticket}/label', [RepairTicketController::class, 'label'])->name('tickets.label');
     Route::post('/tickets/{ticket}/rotate-token', [RepairTicketController::class, 'rotateTrackingToken'])->name('tickets.rotate-token');
     Route::post('/tickets/{ticket}/interventions', [RepairInterventionController::class, 'store'])->name('tickets.interventions.store');
+    Route::post('/tickets/{ticket}/interventions/ai-summary', [RepairInterventionController::class, 'generateClientSummary'])->name('tickets.interventions.ai-summary');
+
+    // Spare Parts & Stock (Catalogue Pièces Détachées)
+    Route::resource('parts', SparePartController::class)->except(['show', 'create', 'edit']);
+    Route::post('/parts/{part}/adjust-stock', [SparePartController::class, 'adjustStock'])->name('parts.adjust-stock');
 
     // Quotes (Devis)
     Route::resource('quotes', QuoteController::class);
     Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
     Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
     Route::post('/quotes/{quote}/refuse', [QuoteController::class, 'refuse'])->name('quotes.refuse');
+    Route::post('/quotes/{quote}/convert-to-invoice', [InvoiceController::class, 'convertFromQuote'])->name('quotes.convert-to-invoice');
     Route::get('/quotes/{quote}/print', [QuoteController::class, 'print'])->name('quotes.print');
 
     // Invoices (Factures) & Payments (Règlements)
     Route::resource('invoices', InvoiceController::class);
-    Route::post('/invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->name('invoices.issue');
+    Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
     Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
 
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/invoices/{invoice}/payments/record', [PaymentController::class, 'store'])->name('invoices.payments.store');
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::post('/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
 
@@ -104,9 +116,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::put('/team/{membership}', [TeamController::class, 'update'])->name('team.update');
     Route::post('/team/{membership}/toggle-status', [TeamController::class, 'toggleStatus'])->name('team.toggle-status');
 
-    // Workshop Settings (Propriétaire uniquement)
+    // Workshop Settings & Multi-Tenant Switch
     Route::get('/settings', [WorkshopSettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings', [WorkshopSettingsController::class, 'update'])->name('settings.update');
+    Route::post('/tenant/switch', [WorkshopSettingsController::class, 'switchTenant'])->name('tenant.switch');
 
     // Reports & Audit (Admin & Propriétaire)
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

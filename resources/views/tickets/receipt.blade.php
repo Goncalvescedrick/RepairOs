@@ -93,10 +93,18 @@
         </div>
     </div>
 
-    <!-- Encadré Suivi Client en ligne -->
-    <div class="tracking-box">
-        <strong style="color: #1d4ed8;">Suivez l'avancement de votre réparation en temps réel :</strong><br>
-        Lien public de consultation : <span style="font-family: monospace; font-weight: bold;">{{ url("/suivi/{$ticket->public_tracking_token}") }}</span>
+    <!-- Encadré Suivi Client en ligne & Garantie -->
+    <div class="tracking-box" style="display: flex; align-items: center; justify-content: space-between; text-align: left; gap: 16px;">
+        <div>
+            <strong style="color: #1d4ed8; font-size: 13px;">Suivez l'avancement de votre réparation et validez votre devis en direct :</strong><br>
+            <span>Lien sécurisé : <span style="font-family: monospace; font-weight: bold;">{{ url("/suivi/{$ticket->public_tracking_token}") }}</span></span><br>
+            <span style="font-size: 11px; color: #475569;">Garantie SAV après réparation : <strong>{{ $ticket->warranty_days ?? 30 }} jours</strong> sur l'intervention réalisée.</span>
+        </div>
+        <div style="text-align: center; flex-shrink: 0;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data={{ urlencode(url("/suivi/{$ticket->public_tracking_token}")) }}"
+                 alt="QR Suivi" width="76" height="76" style="border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px; background: #fff;">
+            <div style="font-size: 9px; color: #1e40af; font-weight: bold; margin-top: 2px;">SCANNER POUR SUIVI</div>
+        </div>
     </div>
 
     <!-- Conditions Générales -->

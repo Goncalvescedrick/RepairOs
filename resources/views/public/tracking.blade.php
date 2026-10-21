@@ -80,28 +80,126 @@
 
             <!-- Ready for pickup announcement -->
             @if($ticket->status->value === 'PRET_A_RETIRER')
+                @php
+                    $openInvoice = $ticket->invoices->first();
+                @endphp
                 <div class="mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start space-x-3">
                     <div class="p-2 bg-emerald-500 text-white rounded-lg shrink-0 mt-0.5">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                     </div>
-                    <div>
+                    <div class="space-y-1">
                         <h4 class="text-sm font-bold text-emerald-950">Votre équipement est prêt à être récupéré !</h4>
-                        <p class="text-xs text-emerald-800 mt-1 leading-relaxed">
+                        <p class="text-xs text-emerald-800 leading-relaxed">
                             L'intervention et les tests de contrôle sont terminés. Vous pouvez vous présenter à l'atelier muni de votre bon de prise en charge pour récupérer votre appareil.
                         </p>
+                        @if($openInvoice && (float) $openInvoice->balance_due > 0)
+                            <div class="pt-1 font-bold text-xs text-emerald-950">
+                                Solde restant à régler au retrait : {{ number_format($openInvoice->balance_due, 0, ',', ' ') }} {{ $openInvoice->currency }} (Facture {{ $openInvoice->reference }})
+                            </div>
+                        @endif
                     </div>
                 </div>
             @elseif($ticket->status->value === 'RESTITUE')
-                <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center space-x-3 text-slate-700 text-xs">
-                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span>Cet appareil a été restitué le {{ $ticket->closed_at ? $ticket->closed_at->format('d/m/Y à H:i') : 'Récemment' }}. Merci pour votre confiance !</span>
+                <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-slate-700 text-xs">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Cet appareil a été restitué le {{ $ticket->closed_at ? $ticket->closed_at->format('d/m/Y à H:i') : 'Récemment' }}. Merci pour votre confiance !</span>
+                    </div>
+                    @if($ticket->isUnderWarranty())
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                            Sous garantie SAV jusqu'au {{ $ticket->warranty_expires_at->format('d/m/Y') }}
+                        </span>
+                    @endif
                 </div>
             @endif
         </div>
+
+        <!-- Flash messages for public quote actions -->
+        @if(session('success'))
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-900">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        <!-- Devis en attente de validation ou validés (Approbation en ligne 1-clic) -->
+        @if($ticket->quotes && $ticket->quotes->count() > 0)
+            @foreach($ticket->quotes as $quote)
+                <div class="bg-white rounded-2xl p-6 border {{ $quote->status->value === 'ENVOYE' ? 'border-blue-300 ring-2 ring-blue-500/10' : 'border-slate-200/80' }} shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Proposition de Devis</span>
+                            <div class="text-lg font-extrabold text-slate-900 font-mono">{{ $quote->reference }}</div>
+                        </div>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border {{ $quote->status->badgeClasses() }}">
+                            {{ $quote->status->label() }}
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-500 font-semibold uppercase">
+                                <tr>
+                                    <th class="px-3 py-2">Désignation</th>
+                                    <th class="px-3 py-2 text-center">Qté</th>
+                                    <th class="px-3 py-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach($quote->items as $item)
+                                    <tr>
+                                        <td class="px-3 py-2 font-medium text-slate-800">{{ $item->description }}</td>
+                                        <td class="px-3 py-2 text-center text-slate-600">{{ number_format($item->quantity, 0) }}</td>
+                                        <td class="px-3 py-2 text-right font-bold text-slate-900">{{ number_format($item->total_price, 0, ',', ' ') }} {{ $quote->currency }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-sm">
+                        <span class="font-bold text-slate-700">Montant Total Net :</span>
+                        <span class="text-lg font-extrabold text-blue-700">{{ number_format($quote->total_amount, 0, ',', ' ') }} {{ $quote->currency }}</span>
+                    </div>
+
+                    @if($quote->status->value === 'ENVOYE')
+                        <div class="pt-3 border-t border-slate-200 space-y-3 bg-blue-50/50 p-4 rounded-xl">
+                            <div class="text-xs font-bold text-slate-900">Donner votre décision en ligne :</div>
+                            <form action="{{ route('public.tracking.quote.accept', ['token' => $ticket->public_tracking_token, 'quote' => $quote->id]) }}" method="POST" class="flex flex-col sm:flex-row gap-2">
+                                @csrf
+                                <input type="text" name="approved_by_name" required placeholder="Votre nom complet pour signature « Bon pour accord » *"
+                                       value="{{ $ticket->customer->name }}"
+                                       class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition shrink-0">
+                                    ✓ Accepter & Lancer la réparation
+                                </button>
+                            </form>
+
+                            <form action="{{ route('public.tracking.quote.refuse', ['token' => $ticket->public_tracking_token, 'quote' => $quote->id]) }}" method="POST" class="flex flex-col sm:flex-row gap-2 pt-1">
+                                @csrf
+                                <input type="text" name="refusal_reason" placeholder="Motif en cas de refus (facultatif)..."
+                                       class="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                                <button type="submit" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition shrink-0">
+                                    Refuser ce devis
+                                </button>
+                            </form>
+                        </div>
+                    @elseif($quote->status->value === 'ACCEPTE' && $quote->approved_by_name)
+                        <div class="text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                            ✓ Devis approuvé en ligne par <strong>{{ $quote->approved_by_name }}</strong> le {{ $quote->accepted_at?->format('d/m/Y à H:i') }}.
+                        </div>
+                    @endif
+                </div>
+            @endforeach
+        @endif
 
         <!-- Device & Problem Details -->
         <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
@@ -111,7 +209,7 @@
                 <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                     <span class="text-slate-400 block text-[11px]">Appareil</span>
                     <span class="font-bold text-slate-900 text-sm mt-0.5 block">{{ $ticket->device->brand }} {{ $ticket->device->model }}</span>
-                    <span class="text-slate-500 text-[11px]">{{ $ticket->device->device_category_label }}</span>
+                    <span class="text-slate-500 text-[11px]">{{ $ticket->device->category_label }}</span>
                 </div>
 
                 <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">

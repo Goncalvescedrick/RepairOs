@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Quote;
 use App\Models\RepairStatusHistory;
 use App\Models\RepairTicket;
+use App\Models\SparePart;
 use App\Services\TenantManager;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -61,6 +62,10 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
+        $lowStockPartsCount = SparePart::where('is_active', true)
+            ->whereColumn('stock_quantity', '<=', 'min_stock_alert')
+            ->count();
+
         return view('dashboard', compact(
             'tenant',
             'currency',
@@ -73,7 +78,8 @@ class DashboardController extends Controller
             'paymentsThisMonth',
             'totalOutstandingBalance',
             'recentTickets',
-            'recentHistories'
+            'recentHistories',
+            'lowStockPartsCount'
         ));
     }
 }

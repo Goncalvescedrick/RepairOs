@@ -4,11 +4,21 @@
     <div class="max-w-4xl mx-auto space-y-6" x-data="{
         taxRate: {{ old('tax_rate', $tenant->tax_rate ?: 0) }},
         discount: {{ old('discount_amount', 0) }},
+        spareParts: @js(($spareParts ?? collect())->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'selling_price' => (float)$p->selling_price, 'stock_quantity' => $p->stock_quantity])->values()),
         items: [
-            { type: 'SERVICE', description: 'Main d’œuvre / Réparation', quantity: 1, unit_price: 15000 },
+            { spare_part_id: '', type: 'SERVICE', description: 'Main d’œuvre / Réparation', quantity: 1, unit_price: 15000 },
         ],
         addItem() {
-            this.items.push({ type: 'PART', description: '', quantity: 1, unit_price: 0 });
+            this.items.push({ spare_part_id: '', type: 'PART', description: '', quantity: 1, unit_price: 0 });
+        },
+        selectSparePart(index) {
+            const item = this.items[index];
+            const found = this.spareParts.find(p => p.id == item.spare_part_id);
+            if (found) {
+                item.type = 'PART';
+                item.description = found.name + (found.sku ? ` (${found.sku})` : '');
+                item.unit_price = found.selling_price;
+            }
         },
         removeItem(index) {
             if (this.items.length > 1) {
@@ -18,11 +28,14 @@
         subtotal() {
             return this.items.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0)), 0);
         },
+        netCommercial() {
+            return Math.max(0, this.subtotal() - (parseFloat(this.discount) || 0));
+        },
         taxAmount() {
-            return (this.subtotal() * (parseFloat(this.taxRate) || 0)) / 100;
+            return (this.netCommercial() * (parseFloat(this.taxRate) || 0)) / 100;
         },
         total() {
-            return Math.max(0, this.subtotal() - (parseFloat(this.discount) || 0) + this.taxAmount());
+            return Math.max(0, this.netCommercial() + this.taxAmount());
         },
         format(val) {
             return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -88,7 +101,15 @@
                                                 <option value="OTHER">Autre</option>
                                             </select>
                                         </td>
-                                        <td class="px-4 py-2">
+                                        <td class="px-4 py-2 space-y-1">
+                                            <template x-if="item.type === 'PART' && spareParts.length > 0">
+                                                <select :name="`items[${index}][spare_part_id]`" x-model="item.spare_part_id" @change="selectSparePart(index)" class="w-full py-1 px-2 bg-blue-50/60 border border-blue-200 rounded text-[11px] text-blue-900">
+                                                    <option value="">-- Choisir du stock (ou saisie libre) --</option>
+                                                    <template x-for="part in spareParts" :key="part.id">
+                                                        <option :value="part.id" x-text="`${part.name} (Stock: ${part.stock_quantity}) — ${format(part.selling_price)}`"></option>
+                                                    </template>
+                                                </select>
+                                            </template>
                                             <input type="text" :name="`items[${index}][description]`" x-model="item.description" required placeholder="Désignation de la pièce ou tâche..." class="w-full py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs">
                                         </td>
                                         <td class="px-4 py-2 text-center">

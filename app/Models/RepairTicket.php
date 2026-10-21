@@ -11,10 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Crypt;
 
 class RepairTicket extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToTenant;
+    use BelongsToTenant, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',
@@ -26,11 +27,15 @@ class RepairTicket extends Model
         'priority',
         'reported_issue',
         'intake_condition',
+        'intake_checklist',
         'accessories_received',
         'deposit_date',
         'estimated_completion_date',
         'closed_at',
+        'warranty_days',
+        'warranty_expires_at',
         'internal_notes',
+        'device_access_code_encrypted',
         'client_notes',
         'public_tracking_token',
     ];
@@ -40,10 +45,40 @@ class RepairTicket extends Model
         return [
             'status' => RepairStatus::class,
             'priority' => TicketPriority::class,
+            'intake_checklist' => 'array',
             'deposit_date' => 'datetime',
             'estimated_completion_date' => 'datetime',
             'closed_at' => 'datetime',
+            'warranty_days' => 'integer',
+            'warranty_expires_at' => 'datetime',
         ];
+    }
+
+    public function setAccessCode(?string $plainCode): void
+    {
+        if (empty(trim((string) $plainCode))) {
+            $this->device_access_code_encrypted = null;
+        } else {
+            $this->device_access_code_encrypted = Crypt::encryptString(trim($plainCode));
+        }
+    }
+
+    public function getDecryptedAccessCodeAttribute(): ?string
+    {
+        if (empty($this->device_access_code_encrypted)) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($this->device_access_code_encrypted);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    public function isUnderWarranty(): bool
+    {
+        return $this->warranty_expires_at !== null && $this->warranty_expires_at->isFuture();
     }
 
     public function customer(): BelongsTo

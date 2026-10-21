@@ -5,11 +5,38 @@
         cancelModalOpen: false,
         paymentModalOpen: false,
         interventionModalOpen: false,
+        showAccessCode: false,
+        aiGenerating: false,
         copySuccess: false,
         copyTrackingLink() {
             navigator.clipboard.writeText('{{ url("/suivi/{$ticket->public_tracking_token}") }}');
             this.copySuccess = true;
             setTimeout(() => this.copySuccess = false, 2500);
+        },
+        async generateAiClientSummary() {
+            this.aiGenerating = true;
+            try {
+                const res = await fetch('{{ route("tickets.interventions.ai-summary", $ticket) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        intervention_type: document.getElementById('intervention_type').value,
+                        work_performed: document.getElementById('work_performed').value,
+                        diagnosis: document.getElementById('diagnosis').value,
+                        test_results: document.getElementById('test_results').value,
+                    })
+                });
+                const data = await res.json();
+                if (data.summary) {
+                    document.getElementById('customer_summary').value = data.summary;
+                }
+            } finally {
+                this.aiGenerating = false;
+            }
         }
     }">
         <!-- En-tête du Ticket -->
@@ -23,6 +50,11 @@
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border {{ $ticket->priority->badgeClasses() }}">
                         Priorité {{ $ticket->priority->label() }}
                     </span>
+                    @if($ticket->isUnderWarranty())
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Garantie SAV jusqu'au {{ $ticket->warranty_expires_at->format('d/m/Y') }}
+                    </span>
+                    @endif
                 </div>
                 <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
                     <span>Dépôt le <strong>{{ $ticket->deposit_date->format('d/m/Y à H:i') }}</strong></span>
@@ -47,6 +79,12 @@
                 <a href="{{ route('tickets.receipt', $ticket) }}" target="_blank" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     Bon de Dépôt
+                </a>
+
+                <!-- Étiquette Thermique QR -->
+                <a href="{{ route('tickets.label', $ticket) }}" target="_blank" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold transition" title="Imprimer l'étiquette autocollante avec QR Code">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    Étiquette QR
                 </a>
 
                 <!-- Boutons de transitions permises -->
@@ -107,6 +145,45 @@
                             <span class="text-slate-700 font-medium">{{ $ticket->accessories_received ?: 'Aucun accessoire' }}</span>
                         </div>
                     </div>
+
+                    @if(!empty($ticket->intake_checklist))
+                    <div class="pt-2 border-t border-slate-100">
+                        <span class="text-slate-400 font-semibold block text-[11px] uppercase tracking-wider mb-1.5">Grille d'inspection visuelle à l'entrée :</span>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                            @php
+                                $checkLabels = [
+                                    'screen' => 'Écran',
+                                    'keyboard' => 'Clavier',
+                                    'chassis' => 'Châssis',
+                                    'battery' => 'Batterie',
+                                    'ports' => 'Connectique',
+                                    'power' => 'Allumage',
+                                ];
+                            @endphp
+                            @foreach($ticket->intake_checklist as $key => $val)
+                                @if($val)
+                                <div class="bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/80 flex items-center justify-between">
+                                    <span class="text-slate-500">{{ $checkLabels[$key] ?? $key }} :</span>
+                                    <span class="font-semibold text-slate-800">{{ $val }}</span>
+                                </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($ticket->decrypted_access_code)
+                    <div class="pt-2 text-xs flex items-center justify-between bg-indigo-50/70 p-2.5 rounded-lg border border-indigo-200">
+                        <div>
+                            <span class="text-indigo-900 font-bold uppercase tracking-wider text-[10px] block">Coffre-fort temporaire (Code PIN / Session) :</span>
+                            <span x-show="!showAccessCode" class="font-mono text-indigo-700">••••••••</span>
+                            <span x-show="showAccessCode" class="font-mono font-bold text-indigo-950">{{ $ticket->decrypted_access_code }}</span>
+                        </div>
+                        <button type="button" @click="showAccessCode = !showAccessCode" class="px-2.5 py-1 bg-white text-indigo-700 border border-indigo-200 rounded font-semibold text-[11px]">
+                            <span x-text="showAccessCode ? 'Masquer' : 'Révéler'"></span>
+                        </button>
+                    </div>
+                    @endif
 
                     @if($ticket->internal_notes)
                     <div class="pt-2 text-xs">
@@ -189,9 +266,9 @@
                         <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Photos & Documents Joints ({{ $ticket->attachments->count() }})</h2>
                     </div>
 
-                    <form action="{{ route('attachments.store') }}" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2">
+                    <form action="{{ route('attachments.store') }}" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row sm:items-center gap-2">
                         @csrf
-                        <input type="hidden" name="attachable_type" value="App\Models\RepairTicket">
+                        <input type="hidden" name="attachable_type" value="ticket">
                         <input type="hidden" name="attachable_id" value="{{ $ticket->id }}">
                         <select name="file_category" class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg">
                             <option value="INTAKE_PHOTO">Photo à l'entrée</option>
@@ -200,6 +277,10 @@
                             <option value="PROOF">Preuve / Restitution</option>
                         </select>
                         <input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" required class="text-xs flex-1">
+                        <label class="inline-flex items-center space-x-1.5 text-xs text-slate-600 shrink-0">
+                            <input type="checkbox" name="is_public_to_client" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span>Visible client</span>
+                        </label>
                         <button type="submit" class="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-900 transition shrink-0">
                             + Téléverser
                         </button>
@@ -449,7 +530,13 @@
                     </div>
 
                     <div>
-                        <label for="customer_summary" class="block text-xs font-semibold text-slate-700 mb-1">Synthèse destinée au client (optionnel)</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="customer_summary" class="block text-xs font-semibold text-slate-700">Synthèse destinée au client (visible sur le suivi en ligne)</label>
+                            <button type="button" @click="generateAiClientSummary()" :disabled="aiGenerating" class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-semibold transition">
+                                <span x-show="!aiGenerating">✨ Copilot : Générer synthèse client</span>
+                                <span x-show="aiGenerating">Génération en cours...</span>
+                            </button>
+                        </div>
                         <input id="customer_summary" type="text" name="customer_summary" placeholder="ex: Nettoyage et remplacement pâte thermique effectués." class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg">
                     </div>
 

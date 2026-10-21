@@ -77,6 +77,17 @@
                     <textarea id="internal_notes" name="internal_notes" rows="2" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg">{{ old('internal_notes', $ticket->internal_notes) }}</textarea>
                 </div>
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="device_access_code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Code PIN / Session (Chiffré)</label>
+                        <input id="device_access_code" type="text" name="device_access_code" value="{{ old('device_access_code', $ticket->decrypted_access_code) }}" placeholder="Laisser vide pour effacer..." class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label for="warranty_days" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Durée Garantie SAV (Jours)</label>
+                        <input id="warranty_days" type="number" min="0" max="1095" name="warranty_days" value="{{ old('warranty_days', $ticket->warranty_days ?? 30) }}" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg">
+                    </div>
+                </div>
+
                 <div>
                     <label for="client_notes" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Notes client</label>
                     <textarea id="client_notes" name="client_notes" rows="2" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg">{{ old('client_notes', $ticket->client_notes) }}</textarea>

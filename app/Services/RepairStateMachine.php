@@ -125,6 +125,14 @@ class RepairStateMachine
 
             if ($targetStatus->isTerminal()) {
                 $ticket->closed_at = now();
+                // Purge confidential temporary access code upon restitution or cancellation
+                $ticket->device_access_code_encrypted = null;
+            }
+
+            if ($targetStatus === RepairStatus::RESTITUE) {
+                $warrantyDays = $ticket->warranty_days ?? 30;
+                $ticket->warranty_days = $warrantyDays;
+                $ticket->warranty_expires_at = $warrantyDays > 0 ? now()->addDays($warrantyDays) : null;
             }
 
             $ticket->save();

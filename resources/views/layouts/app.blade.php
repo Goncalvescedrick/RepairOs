@@ -23,6 +23,9 @@
         $currentTenant = app(\App\Services\TenantManager::class)->getTenant();
         $currentUser = auth()->user();
         $userRole = $currentUser && $currentTenant ? $currentUser->roleInTenant($currentTenant->id) : null;
+        $userMemberships = $currentUser
+            ? $currentUser->memberships()->where('is_active', true)->with('tenant')->get()
+            : collect();
     @endphp
 
     <div class="min-h-full flex flex-col lg:flex-row">
@@ -54,6 +57,20 @@
                         {{ $userRole ? $userRole->label() : '' }}
                     </span>
                 </div>
+                @if($userMemberships->count() > 1)
+                <form action="{{ route('tenant.switch') }}" method="POST" class="mt-2.5">
+                    @csrf
+                    <select name="tenant_id" onchange="this.form.submit()" class="w-full text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        @foreach($userMemberships as $membership)
+                            @if($membership->tenant && $membership->tenant->is_active)
+                            <option value="{{ $membership->tenant_id }}" {{ $membership->tenant_id === $currentTenant->id ? 'selected' : '' }}>
+                                Changer : {{ $membership->tenant->name }}
+                            </option>
+                            @endif
+                        @endforeach
+                    </select>
+                </form>
+                @endif
             </div>
             @endif
 
@@ -77,6 +94,11 @@
                 <a href="{{ route('devices.index') }}" class="flex items-center px-3 py-2.5 rounded-lg transition {{ request()->routeIs('devices.*') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <svg class="w-5 h-5 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     Appareils
+                </a>
+
+                <a href="{{ route('parts.index') }}" class="flex items-center px-3 py-2.5 rounded-lg transition {{ request()->routeIs('parts.*') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                    <svg class="w-5 h-5 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Stock & Pièces
                 </a>
 
                 <a href="{{ route('quotes.index') }}" class="flex items-center px-3 py-2.5 rounded-lg transition {{ request()->routeIs('quotes.*') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
@@ -169,6 +191,7 @@
                 <a href="{{ route('tickets.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Réparations</a>
                 <a href="{{ route('customers.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Clients</a>
                 <a href="{{ route('devices.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Appareils</a>
+                <a href="{{ route('parts.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Stock & Pièces</a>
                 <a href="{{ route('quotes.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Devis</a>
                 <a href="{{ route('invoices.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Factures & Paiements</a>
                 <a href="{{ route('reports.index') }}" class="block px-3 py-2 rounded-md text-sm font-medium hover:bg-slate-800">Rapports</a>

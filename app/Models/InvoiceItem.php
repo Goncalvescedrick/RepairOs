@@ -12,10 +12,12 @@ class InvoiceItem extends Model
 
     protected $fillable = [
         'invoice_id',
+        'spare_part_id',
         'type', // SERVICE, PART, OTHER
         'description',
         'quantity',
         'unit_price',
+        'purchase_cost_unit',
         'total_price',
     ];
 
@@ -24,6 +26,7 @@ class InvoiceItem extends Model
         return [
             'quantity' => 'decimal:2',
             'unit_price' => 'decimal:2',
+            'purchase_cost_unit' => 'decimal:2',
             'total_price' => 'decimal:2',
         ];
     }
@@ -31,5 +34,10 @@ class InvoiceItem extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function sparePart(): BelongsTo
+    {
+        return $this->belongsTo(SparePart::class);
     }
 }

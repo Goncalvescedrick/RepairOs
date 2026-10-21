@@ -112,6 +112,12 @@
                 <a href="{{ route('quotes.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center mt-2">
                     Voir les devis en attente d'accord &rarr;
                 </a>
+                @if(isset($lowStockPartsCount) && $lowStockPartsCount > 0)
+                <a href="{{ route('parts.index', ['low_stock' => 1]) }}" class="mt-2 pt-2 border-t border-slate-100 text-[11px] font-bold text-rose-600 hover:underline flex items-center justify-between">
+                    <span>⚠ {{ $lowStockPartsCount }} pièce(s) en stock critique</span>
+                    <span>Gérer &rarr;</span>
+                </a>
+                @endif
             </div>
         </div>
 

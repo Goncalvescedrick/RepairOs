@@ -23,11 +23,17 @@ class FinancialCalculationsTest extends TestCase
     use RefreshDatabase;
 
     protected Tenant $tenant;
+
     protected User $user;
+
     protected Customer $customer;
+
     protected RepairTicket $ticket;
+
     protected QuoteService $quoteService;
+
     protected InvoiceService $invoiceService;
+
     protected PaymentService $paymentService;
 
     protected function setUp(): void
@@ -82,8 +88,9 @@ class FinancialCalculationsTest extends TestCase
 
         // Subtotal = 20 000 + 10 000 = 30 000
         // Discount = 2 000
-        // Tax 18% on 30 000 = 5 400
-        // Total = 30 000 - 2 000 + 5 400 = 33 400
+        // Net Commercial = 30 000 - 2 000 = 28 000
+        // Tax 18% on 28 000 = 5 040
+        // Total = 28 000 + 5 040 = 33 040
 
         $quote = $this->quoteService->createQuote(
             ticket: $this->ticket,
@@ -94,8 +101,8 @@ class FinancialCalculationsTest extends TestCase
 
         $this->assertEquals(30000.00, (float) $quote->subtotal_amount);
         $this->assertEquals(2000.00, (float) $quote->discount_amount);
-        $this->assertEquals(5400.00, (float) $quote->tax_amount);
-        $this->assertEquals(33400.00, (float) $quote->total_amount);
+        $this->assertEquals(5040.00, (float) $quote->tax_amount);
+        $this->assertEquals(33040.00, (float) $quote->total_amount);
         $this->assertEquals(QuoteStatus::BROUILLON, $quote->status);
     }
 

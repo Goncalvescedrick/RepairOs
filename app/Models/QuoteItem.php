@@ -12,10 +12,12 @@ class QuoteItem extends Model
 
     protected $fillable = [
         'quote_id',
+        'spare_part_id',
         'type', // SERVICE, PART, OTHER
         'description',
         'quantity',
         'unit_price',
+        'purchase_cost_unit',
         'total_price',
     ];
 
@@ -24,6 +26,7 @@ class QuoteItem extends Model
         return [
             'quantity' => 'decimal:2',
             'unit_price' => 'decimal:2',
+            'purchase_cost_unit' => 'decimal:2',
             'total_price' => 'decimal:2',
         ];
     }
@@ -31,5 +34,10 @@ class QuoteItem extends Model
     public function quote(): BelongsTo
     {
         return $this->belongsTo(Quote::class);
+    }
+
+    public function sparePart(): BelongsTo
+    {
+        return $this->belongsTo(SparePart::class);
     }
 }
